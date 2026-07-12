@@ -1,0 +1,51 @@
+# ─────────────────────────────────────────────────────────
+# Render Blueprint — hris-core-api
+# https://render.com/docs/blueprint-spec
+# ─────────────────────────────────────────────────────────
+
+services:
+  - type: web
+    name: hris-core-api
+    env: docker
+    region: singapore # Closest to Philippines
+    plan: starter # or standard / pro
+    healthCheckPath: /api
+    numInstances: 1
+
+    envVars:
+      # ── Application ──────────────────────────────────
+      - key: NODE_ENV
+        value: production
+      - key: API_PREFIX
+        value: api
+      - key: CORS_ORIGIN
+        value: https://your-frontend.onrender.com  # ← update this!
+
+      # ── Database — set via Render Dashboard ──────────
+      # Render Postgres will auto-inject DATABASE_URL if linked.
+      # If using an external DB, set DATABASE_URL manually:
+      # - key: DATABASE_URL
+      #   sync: false  # secret — set in dashboard only
+
+      # ── Optional: DB parts (if not using DATABASE_URL) ──
+      # - key: DB_HOST
+      #   sync: false
+      # - key: DB_PORT
+      #   sync: false
+      # - key: DB_USERNAME
+      #   sync: false
+      # - key: DB_PASSWORD
+      #   sync: false
+      # - key: DB_NAME
+      #   sync: false
+
+# ─────────────────────────────────────────────────────────
+# If you also want a managed PostgreSQL on Render,
+# add a database service:
+#
+# databases:
+#   - name: hris-postgres
+#     plan: starter
+#     region: singapore
+#     postgresMajorVersion: 16
+# ─────────────────────────────────────────────────────────

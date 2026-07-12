@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Testing
+coverage/
+test/
+
+# Git
+.git/
+.gitignore
+
+# Prisma Studio / generated (will be regenerated)
+# src/generated/prisma/ — keep in repo, don't ignore
+
+# Documentation
+context/
+README.md
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose*.yml
