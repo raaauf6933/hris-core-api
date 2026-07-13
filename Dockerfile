@@ -66,4 +66,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD node -e "require('http').get('http://localhost:'+(process.env.PORT||3000)+'/api',r=>{process.exit(r.statusCode===200?0:1)})"
 
 # Entrypoint: run migrations, then start the server
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main"]
