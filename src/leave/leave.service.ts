@@ -41,6 +41,7 @@ export class LeaveService {
   // ──────────────────────────────────────────────
 
   async getMyBalances(employeeId: string, year?: number) {
+    if (!employeeId) return [];
     const targetYear = year ?? new Date().getFullYear();
     return this.prisma.leaveBalance.findMany({
       where: { employeeId, year: targetYear },
@@ -232,6 +233,8 @@ export class LeaveService {
   // ──────────────────────────────────────────────
 
   async getMyRequests(employeeId: string, query: QueryLeaveRequestDto) {
+    if (!employeeId) return { data: [], meta: { total: 0, page: 1, limit: 20, totalPages: 0 } };
+
     const { status, leaveTypeId, page = 1, limit = 20 } = query;
 
     const where: Prisma.LeaveRequestWhereInput = {
@@ -319,16 +322,19 @@ export class LeaveService {
   // ──────────────────────────────────────────────
 
   async getPendingApprovals(userId: string, employeeId: string) {
-    // Get the user's roles
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: { userRoles: { include: { role: true } } },
-    });
-    if (!user) throw new NotFoundException('User not found');
-
-    const isAdmin = user.userRoles.some((ur) =>
-      ['system_admin', 'hr_admin'].includes(ur.role.name),
-    );
+    // Try to resolve admin/HR role from userId (if it's a valid UUID with a linked user)
+    let isAdmin = false;
+    if (userId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        include: { userRoles: { include: { role: true } } },
+      });
+      if (user) {
+        isAdmin = user.userRoles.some((ur) =>
+          ['system_admin', 'hr_admin'].includes(ur.role.name),
+        );
+      }
+    }
 
     if (isAdmin) {
       // Admin/HR sees all pending
@@ -345,6 +351,7 @@ export class LeaveService {
     }
 
     // Manager: get direct reports
+    if (!employeeId) return [];
     const subordinates = await this.prisma.employee.findMany({
       where: { managerId: employeeId, isDeleted: false },
       select: { id: true },
@@ -387,15 +394,19 @@ export class LeaveService {
       throw new BadRequestException(`Cannot approve a request with status: ${request.status}`);
     }
 
-    // Check authorization
-    const user = await this.prisma.user.findUnique({
-      where: { id: approverUserId },
-      include: { userRoles: { include: { role: true } } },
-    });
+    // Check authorization: only if approverUserId is a real UUID
+    const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(approverUserId);
+    let isAdmin = false;
 
-    const isAdmin = user?.userRoles.some((ur) =>
-      ['system_admin', 'hr_admin'].includes(ur.role.name),
-    );
+    if (isValidUuid) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: approverUserId },
+        include: { userRoles: { include: { role: true } } },
+      });
+      isAdmin = user?.userRoles.some((ur) =>
+        ['system_admin', 'hr_admin'].includes(ur.role.name),
+      ) ?? false;
+    }
 
     if (!isAdmin) {
       // Manager check: is the requester a direct report?
@@ -406,12 +417,12 @@ export class LeaveService {
 
     // Approve and deduct balance
     return this.prisma.$transaction(async (tx) => {
-      // Update request status
+      // Update request status (only set approvedById if valid UUID)
       const updated = await tx.leaveRequest.update({
         where: { id },
         data: {
           status: 'Approved',
-          approvedById: approverUserId,
+          approvedById: isValidUuid ? approverUserId : null,
           approvedAt: new Date(),
         },
         include: {
@@ -461,14 +472,19 @@ export class LeaveService {
       throw new BadRequestException(`Cannot reject a request with status: ${request.status}`);
     }
 
-    // Check authorization (same logic as approve)
-    const user = await this.prisma.user.findUnique({
-      where: { id: approverUserId },
-      include: { userRoles: { include: { role: true } } },
-    });
-    const isAdmin = user?.userRoles.some((ur) =>
-      ['system_admin', 'hr_admin'].includes(ur.role.name),
-    );
+    // Check authorization (same logic as approve — skip if not valid UUID)
+    const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(approverUserId);
+    let isAdmin = false;
+
+    if (isValidUuid) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: approverUserId },
+        include: { userRoles: { include: { role: true } } },
+      });
+      isAdmin = user?.userRoles.some((ur) =>
+        ['system_admin', 'hr_admin'].includes(ur.role.name),
+      ) ?? false;
+    }
     if (!isAdmin && request.employee.managerId !== approverEmployeeId) {
       throw new ForbiddenException('You are not the direct manager of this employee');
     }
@@ -477,7 +493,7 @@ export class LeaveService {
       where: { id },
       data: {
         status: 'Rejected',
-        approvedById: approverUserId, // records WHO rejected
+        approvedById: isValidUuid ? approverUserId : null,
         approvedAt: new Date(),
         rejectionReason: reason,
       },

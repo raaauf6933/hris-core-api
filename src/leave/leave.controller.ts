@@ -28,20 +28,30 @@ interface DevUser {
 }
 
 async function resolveDevUser(req: Request, prisma: PrismaService): Promise<DevUser> {
-  const userId = (req.headers['x-user-id'] as string) || '';
+  const headerUserId = (req.headers['x-user-id'] as string) || '';
   const employeeCode = (req.headers['x-employee-code'] as string) || '';
 
+  let userId = '';
   let employeeId = '';
 
   // If x-employee-code is provided (e.g. "EMP-0003"), look up the real UUID
   if (employeeCode) {
     const emp = await prisma.employee.findUnique({
       where: { employeeCode },
-      select: { id: true },
+      select: { id: true, user: { select: { id: true } } },
     });
     if (emp) {
       employeeId = emp.id;
+      // Also resolve userId from the employee (they may have a linked user)
+      if (emp.user?.id) {
+        userId = emp.user.id;
+      }
     }
+  }
+
+  // If userId is still empty and header value is a valid UUID, use it directly
+  if (!userId && headerUserId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(headerUserId)) {
+    userId = headerUserId;
   }
 
   // Fallback: try x-employee-id directly (for API testing with real UUIDs)
