@@ -66,4 +66,6 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD node -e "require('http').get('http://localhost:'+(process.env.PORT||3000)+'/api',r=>{process.exit(r.statusCode===200?0:1)})"
 
 # Entrypoint: run migrations, then start the server
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main"]
+# --no-experimental-require-module is scoped to the node process only (not ENV)
+# because npx/prisma internally needs the default behavior to load ESM deps.
+CMD ["sh", "-c", "npx prisma migrate deploy && node --no-experimental-require-module dist/src/main"]
