@@ -29,6 +29,12 @@ COPY config/ ./config/
 # Build NestJS app
 RUN npm run build
 
+# Patch: Prisma 7's generated client uses import.meta.url (ESM-only syntax).
+# TypeScript with module=commonjs cannot transpile it, so it leaks into the CJS output.
+# Replace it with a static file URL equivalent for the target deployment path.
+RUN find dist/src/generated/prisma -name '*.js' -exec sed -i \
+    "s|import\.meta\.url|'file:///app/dist/src/generated/prisma/client.js'|g" {} +
+
 # ─── Stage 2: Production ───────────────────────────────
 FROM node:22-alpine AS production
 
@@ -45,7 +51,6 @@ COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 # Copy build artifacts from build stage
-# (generated Prisma client is compiled into dist/ — no need to copy .prisma separately)
 COPY --from=build /app/dist/ ./dist/
 
 # Copy Prisma resources needed for runtime migrations
@@ -66,6 +71,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD node -e "require('http').get('http://localhost:'+(process.env.PORT||3000)+'/api',r=>{process.exit(r.statusCode===200?0:1)})"
 
 # Entrypoint: run migrations, then start the server
-# --no-experimental-require-module is scoped to the node process only (not ENV)
-# because npx/prisma internally needs the default behavior to load ESM deps.
-CMD ["sh", "-c", "npx prisma migrate deploy && node --no-experimental-require-module dist/src/main"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main"]

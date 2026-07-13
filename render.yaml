@@ -39,10 +39,6 @@ services:
       # - key: DB_NAME
       #   sync: false
 
-      # ── Node.js: prevent CJS/ESM context corruption ──
-      - key: NODE_OPTIONS
-        value: "--no-experimental-require-module"
-
 # ─────────────────────────────────────────────────────────
 # If you also want a managed PostgreSQL on Render,
 # add a database service:
