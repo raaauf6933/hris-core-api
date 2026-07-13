@@ -45,9 +45,8 @@ COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 # Copy build artifacts from build stage
+# (generated Prisma client is compiled into dist/ — no need to copy .prisma separately)
 COPY --from=build /app/dist/ ./dist/
-COPY --from=build /app/node_modules/.prisma/ ./node_modules/.prisma/
-COPY --from=build /app/node_modules/@prisma/ ./node_modules/@prisma/
 
 # Copy Prisma resources needed for runtime migrations
 COPY --from=build /app/prisma/ ./prisma/
